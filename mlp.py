@@ -338,7 +338,7 @@ class MultiLayerNeuralNetwork(Activation_Functions, Losses, Optimizers):
     def back_propagate(self, y, p):
         error = float('inf')
         if (self.loss_func == 'mse'):
-            error = -(y-p)
+            error = -2*(y-p)
         elif (self.loss_func == 'binary_cross_entropy'):
             error = -(y/p)+((1-y)/(1-p))
 
