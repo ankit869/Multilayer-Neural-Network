@@ -16,7 +16,7 @@ class Activation_Functions():
                 return np.array([1/(1+np.exp(-i)) for i in z])
             else:
                 return 1/(1+np.exp(-z))
-
+    
     def relu(self, z, derive=False):
         if (derive):
             return np.where(z > 0, 1, 0)
@@ -25,7 +25,7 @@ class Activation_Functions():
                 return np.array([max(0, i) for i in z])
             else:
                 return max(0, z)
-
+    
     def tanh(self, z, derive=False):
         if (derive):
             if (isinstance(z, np.ndarray)):
@@ -43,7 +43,7 @@ class Activation_Functions():
             return np.where(z > 0, 1, self.elu(z)+self.elu_alpha)
         else:
             return np.where(z > 0, z, self.elu_alpha*(np.exp(z)+self.elu_alpha))
-
+    
     def leaky_relu(self, z, derive=False):
         if (derive):
             return np.where(z >= 0, 1, self.leaky_relu_fraction)
@@ -52,7 +52,7 @@ class Activation_Functions():
                 return np.array([max(self.leaky_relu_fraction*i, i) for i in z])
             else:
                 return max(self.leaky_relu_fraction*z, z)
-
+    
     def linear(self, z, derive=False):
         if (derive):
             return 1
@@ -62,15 +62,15 @@ class Activation_Functions():
 class Losses:
     def __init__(self):
         super(Losses,self).__init__()
-
+    
     def mse(self, y, p):
         return np.mean((y - p) ** 2)
-
+    
     def binary_cross_entropy(self, y, p):
         return np.mean(-(y*np.log(p)+(1-y)*np.log(1-p)))
 
-
 class instance_variables:
+    
     def __init__(self):
         super(instance_variables,self).__init__()
         self.weights = []
@@ -86,9 +86,7 @@ class instance_variables:
         self.dropout_nodes = []
         self.layers = []
 
-
 class Weight_Initalizer(instance_variables):
-
     def __init__(self):
         super(Weight_Initalizer,self).__init__()
         self.weight_initializer = {
@@ -272,8 +270,7 @@ class MultiLayerNeuralNetwork(Activation_Functions, Losses, Optimizers):
             self.bias.append(np.zeros(self.layers[i]['nodes']))
             self.Vdb.append(np.zeros(self.layers[i]['nodes']))
             self.Mdb.append(np.zeros(self.layers[i]['nodes']))
-            self.dropout_nodes.append(
-                np.zeros(self.layers[i]['nodes'], dtype=bool))
+            self.dropout_nodes.append(np.zeros(self.layers[i]['nodes'], dtype=bool))
             self.derivatives_b.append(np.zeros(self.layers[i]['nodes']))
 
             if (self.layers[i]['dropouts'] == True):
@@ -331,8 +328,7 @@ class MultiLayerNeuralNetwork(Activation_Functions, Losses, Optimizers):
                 if (self.dropout_nodes[i][j] == True and self.layers[i]['dropouts'] == True):
                     self.activations[i][j] = 0
                 else:
-                    self.activations[i][j] = self.preceptron(
-                        self.activations[i-1], self.weights[i-1][j], self.bias[i][j], self.layers[i]['activation_function'])
+                    self.activations[i][j] = self.preceptron(self.activations[i-1], self.weights[i-1][j], self.bias[i][j], self.layers[i]['activation_function'])
         return self.activations[len(self.layers)-1]
 
     def back_propagate(self, y, p):
@@ -372,10 +368,10 @@ class MultiLayerNeuralNetwork(Activation_Functions, Losses, Optimizers):
 
             loss = sum_errors / batch_size
             if (early_stopping == True and len(self.history['Losses']) > 1 and loss > self.history['Losses'][-1]):
-                print(
-                    "\n<================(EARLY STOPPING AT --> EPOCH {})==================> ".format(i))
                 patience_count+=1
                 if(patience_count>=patience):
+                    print(
+                    "\n<================(EARLY STOPPING AT --> EPOCH {})==================> ".format(i))
                     break
             self.history['Losses'].append(loss)
             self.history['Weights'].append(self.weights)
@@ -393,9 +389,12 @@ class MultiLayerNeuralNetwork(Activation_Functions, Losses, Optimizers):
         for j, val in enumerate(x):
             values = val
             for i in range(1, len(self.layers)):
-                z = np.dot(values, self.weights[i-1].T)+self.bias[i]
-                values = self.activation_functions[self.layers[i]['activation_function']](
-                    z)
+                if(self.layers[i-1]['dropouts']==True):
+                    wgt=self.weights[i-1]*self.layers[i-1]['dropout_fraction']
+                    z = np.dot(values, wgt.T)+self.bias[i]
+                else:
+                    z = np.dot(values, self.weights[i-1].T)+self.bias[i]
+                values = self.activation_functions[self.layers[i]['activation_function']](z)
             outputs.append(values)
 
         return np.array(outputs).reshape(-1, self.n_outputs)
