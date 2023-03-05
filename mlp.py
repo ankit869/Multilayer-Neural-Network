@@ -314,21 +314,16 @@ class MultiLayerNeuralNetwork(Activation_Functions, Losses, Optimizers):
                 self.beta1 = value
             elif (key == 'beta2'):
                 self.beta2 = value
-
-    def preceptron(self, inputs, weights, bias, activation_func=None):
-        if (activation_func is None):
-            activation_func = 'linear'
-        output = np.dot(inputs, weights)+bias
-        return self.activation_functions[activation_func](output)
-
-    def forward_propagate(self, x, weights=None, bias=None):
+    
+    def forward_propagate(self, x):
         self.activations[0] = x
         for i in range(1, len(self.layers)):
-            for j in range(self.layers[i]['nodes']):
-                if (self.dropout_nodes[i][j] == True and self.layers[i]['dropouts'] == True):
-                    self.activations[i][j] = 0
-                else:
-                    self.activations[i][j] = self.preceptron(self.activations[i-1], self.weights[i-1][j], self.bias[i][j], self.layers[i]['activation_function'])
+            z = np.dot(self.activations[i-1], self.weights[i-1].T)+self.bias[i]
+            self.activations[i]=self.activation_functions[self.layers[i]['activation_function']](z)
+            
+            if(self.layers[i]['dropouts']==True):
+               self.activations[i][np.where(self.dropout_nodes[i])]=0
+
         return self.activations[len(self.layers)-1]
 
     def back_propagate(self, y, p):
