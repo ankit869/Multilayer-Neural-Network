@@ -32,7 +32,7 @@ class Activation_Functions():
         
         >>np.exp(700) is almost close to inf but not inf
 
-        >>np.exp([700>0]) will produce overflow error
+        >>np.exp([>700]) will produce overflow error
 
         '''
         z=np.clip(z,a_min=-700,a_max=700)
