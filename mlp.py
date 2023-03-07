@@ -1,40 +1,69 @@
+'''
+This is the complete code of MultiLayer Neural Network
+
+Developed by: 
+- Ankit Kohli (Student at Delhi University)
+- ankitkohli181@gmail.com (mail)
+
+This is created as a open source project.
+I request if anybody running this python file, found any error then please report me.
+
+Have fun!
+
+'''
+
 import numpy as np
 import pandas as pd
 import random
 
 class Activation_Functions():
     def __init__(self):
-        super(Activation_Functions,self).__init__()
+        super(Activation_Functions, self).__init__()
         self.leaky_relu_fraction = 0.01
         self.elu_alpha = 0.1
 
     def sigmoid(self, z, derive=False):
+        '''
+        This Clipping is necessary before calculating exponents
+        , because exp(large_number) will produce overflow error
+
+        so clipping inputs with max range of 700
+        will help to handle this error.
+        
+        >>np.exp(700) is almost close to inf but not inf
+
+        >>np.exp([700>0]) will produce overflow error
+
+        '''
+        z=np.clip(z,a_min=-700,a_max=700)
         if (derive):
             return (z*(1-z))
         else:
-            if (isinstance(z, np.ndarray)):
+            if (isinstance(z,np.ndarray)):
                 return np.array([1/(1+np.exp(-i)) for i in z])
             else:
                 return 1/(1+np.exp(-z))
-    
-    def softmax(self,z,derive=False):
-        if(derive):
-            if (z.ndim==2):
-                return [self.softmax(i,derive=True) for i in z]
+
+    def softmax(self, z, derive=False):
+        z=np.clip(z,a_min=-700,a_max=700)
+        if (derive):
+            if (z.ndim == 2):
+                return [self.softmax(i, derive=True) for i in z]
             else:
                 '''
                 This is the Vectorized method for calculating jacobian matrix
                 Reference-https://medium.com/intuitionmath/how-to-implement-the-softmax-derivative-independently-from-any-loss-function-ae6d44363a9d
-                
+
                 z=z.reshape(-1,1)
                 return (np.diagflat(z)-np.dot(z,z.T))
 
                 '''
-                z=z.reshape(-1,1)
-                return (np.diagflat(z)-np.dot(z,z.T))
+                z = z.reshape(-1, 1)
+                return (np.diagflat(z)-np.dot(z, z.T))
 
         else:
             '''
+            Another method in case of softmax for handling overflow error without clipping
             [np.exp(inputs-max(inputs))]
 
             is done just for mathematical convenience
@@ -42,84 +71,90 @@ class Activation_Functions():
             (outputs will have no effect)
 
             '''
-            exp_vals=np.exp(z-np.max(z))
-            return exp_vals/np.sum(exp_vals) 
+            exp_vals = np.exp(z)
+            return exp_vals/np.sum(exp_vals+self.epsilon)
 
     def relu(self, z, derive=False):
         if (derive):
             return np.where(z > 0, 1, 0)
         else:
-            if (isinstance(z, np.ndarray)):
+            if (isinstance(z,np.ndarray)):
                 return np.array([max(0, i) for i in z])
             else:
+                print(z)
                 return max(0, z)
-    
+
     def tanh(self, z, derive=False):
+        z=np.clip(z,a_min=-700,a_max=700)
         if (derive):
-            if (isinstance(z, np.ndarray)):
-                return np.array([(1-self.tanh(i)**2) for i in z])
+            if (isinstance(z,np.ndarray)):
+                return np.array([(1-i**2) for i in z])
             else:
-                return 1-self.tanh(z)**2
+                return 1-z**2
         else:
-            if (isinstance(z, np.ndarray)):
-                return np.array([((np.exp(i)-np.exp(-i))/(np.exp(i)+np.exp(-i))) for i in z])
+            if (isinstance(z,np.ndarray)):
+                return np.array([((np.exp(i)-np.exp(-i))/(np.exp(i)+np.exp(-i)+self.epsilon)) for i in z])
             else:
-                return (np.exp(z)-np.exp(-z))/(np.exp(z)+np.exp(-z))
+                return (np.exp(z)-np.exp(-z))/(np.exp(z)+np.exp(-z)+self.epsilon)
 
     def elu(self, z, derive=False):
+        z=np.clip(z,a_min=-700,a_max=700)
         if (derive):
-            return np.where(z > 0, 1, self.elu(z)+self.elu_alpha)
+            return np.where(z > 0, 1, z+self.elu_alpha)
         else:
             return np.where(z > 0, z, self.elu_alpha*(np.exp(z)+self.elu_alpha))
-    
+
     def leaky_relu(self, z, derive=False):
         if (derive):
             return np.where(z >= 0, 1, self.leaky_relu_fraction)
         else:
-            if (isinstance(z, np.ndarray)):
+            if (isinstance(z,np.ndarray)):
                 return np.array([max(self.leaky_relu_fraction*i, i) for i in z])
             else:
                 return max(self.leaky_relu_fraction*z, z)
-    
+
     def linear(self, z, derive=False):
         if (derive):
             return 1
         else:
             return z
 
+
 class Losses:
     def __init__(self):
-        super(Losses,self).__init__()
-    
+        super(Losses, self).__init__()
+
     def mse(self, y, p):
         return np.mean((y - p) ** 2)
-    
+
     def binary_cross_entropy(self, y, p):
         return np.mean(-(y*np.log(p)+(1-y)*np.log(1-p)))
-    
+
     def categorical_cross_entropy(self, y, p):
         return np.mean(-np.sum(y*np.log(p)))
 
+
 class instance_variables:
-    
+
     def __init__(self):
-        super(instance_variables,self).__init__()
+        super(instance_variables, self).__init__()
         self.weights = []
         self.bias = []
         self.Vdb = []
         self.Vdw = []
         self.Mdw = []
         self.Mdb = []
-        self.derivatives_w=[]
-        self.derivatives_b=[]
+        self.derivatives_w = []
+        self.derivatives_b = []
         self.regularization = None
         self.activations = []
         self.dropout_nodes = []
         self.layers = []
 
+
 class Weight_Initalizer(instance_variables):
     def __init__(self):
-        super(Weight_Initalizer,self).__init__()
+        super(Weight_Initalizer, self).__init__()
         self.weight_initializer = {
             'random_uniform': self.random_uniform,
             'random_normal': self.random_normal,
@@ -129,7 +164,7 @@ class Weight_Initalizer(instance_variables):
             'he_normal': self.he_normal
         }
 
-    def random_uniform(self, seed=None,args=dict()):
+    def random_uniform(self, seed=None, args=dict()):
         minval = -0.05
         maxval = 0.05
         for key, value in args.items():
@@ -137,50 +172,54 @@ class Weight_Initalizer(instance_variables):
                 minval = value
             elif (key == 'maxval'):
                 maxval = value
-            elif(key=='seed'):
+            elif (key == 'seed'):
                 np.random.seed(seed)
-                
+
         for i in range(len(self.layers)-1):
             self.weights[i] = np.random.uniform(minval, maxval, size=(
                 self.layers[i+1]['nodes'], self.layers[i]['nodes']))
 
-    def random_normal(self,args=dict()):
+    def random_normal(self, args=dict()):
         for key, value in args.items():
-            if(key=='seed'):
+            if (key == 'seed'):
                 np.random.seed(value)
         for i in range(len(self.layers)-1):
-            self.weights[i] = np.random.randn(self.layers[i+1]['nodes'], self.layers[i]['nodes'])
+            self.weights[i] = np.random.randn(
+                self.layers[i+1]['nodes'], self.layers[i]['nodes'])
 
-    def glorot_uniform(self,args=dict()):
+    def glorot_uniform(self, args=dict()):
         for key, value in args.items():
-            if(key=='seed'):
+            if (key == 'seed'):
                 np.random.seed(value)
         for i in range(len(self.layers)-1):
-            limit = np.sqrt(6 / (self.layers[i+1]['nodes'] + self.layers[i]['nodes']))
+            limit = np.sqrt(
+                6 / (self.layers[i+1]['nodes'] + self.layers[i]['nodes']))
             vals = np.random.uniform(-limit, limit,size=(self.layers[i+1]['nodes'], self.layers[i]['nodes']))
             self.weights[i] = vals
 
-    def glorot_normal(self,args=dict()):
+    def glorot_normal(self, args=dict()):
         for key, value in args.items():
-            if(key=='seed'):
+            if (key == 'seed'):
                 np.random.seed(value)
         for i in range(len(self.layers)-1):
-            limit = np.sqrt(2 / (self.layers[i+1]['nodes'] + self.layers[i]['nodes']))
-            vals = np.random.randn(self.layers[i+1]['nodes'], self.layers[i]['nodes'])*limit
+            limit = np.sqrt(
+                2 / (self.layers[i+1]['nodes'] + self.layers[i]['nodes']))
+            vals = np.random.randn(
+                self.layers[i+1]['nodes'], self.layers[i]['nodes'])*limit
             self.weights[i] = vals
 
-    def he_uniform(self, seed=None,args=dict()):
+    def he_uniform(self, seed=None, args=dict()):
         for key, value in args.items():
-            if(key=='seed'):
+            if (key == 'seed'):
                 np.random.seed(value)
         for i in range(len(self.layers)-1):
             limit = np.sqrt(6 / (self.layers[i]['nodes']))
-            vals = np.random.uniform(-limit,limit,size=(self.layers[i+1]['nodes'], self.layers[i]['nodes']))
+            vals = np.random.uniform(-limit, limit,size=(self.layers[i+1]['nodes'], self.layers[i]['nodes']))
             self.weights[i] = vals
 
     def he_normal(self, args=dict()):
         for key, value in args.items():
-            if(key=='seed'):
+            if (key == 'seed'):
                 np.random.seed(value)
         for i in range(len(self.layers)-1):
             vals = np.random.randn(
@@ -190,7 +229,7 @@ class Weight_Initalizer(instance_variables):
 
 class Optimizers(Weight_Initalizer):
     def __init__(self):
-        super(Optimizers,self).__init__()
+        super(Optimizers, self).__init__()
         self.epsilon = 1e-07
         self.momentum = 0.9
         self.beta = 0.9
@@ -200,11 +239,11 @@ class Optimizers(Weight_Initalizer):
     def get_gradients(self, layer):
         derivatives_w = None
         derivatives_b = None
-        if(self.regularization=='L2_norm'):
+        if (self.regularization == 'L2_norm'):
             derivatives_w = self.derivatives_w[layer] + (2*self.penalty*self.weights[layer])
-        elif(self.regularization=='L1_norm'):
+        elif (self.regularization == 'L1_norm'):
             derivatives_w = self.derivatives_w[layer]+self.penalty
-        else: 
+        else:
             derivatives_w = self.derivatives_w[layer]
 
         derivatives_b = self.derivatives_b[layer+1].flatten()
@@ -229,16 +268,16 @@ class Optimizers(Weight_Initalizer):
             dw, db = self.get_gradients(i)
             self.Vdw[i] = self.Vdw[i]+(dw**2)
             self.Vdb[i+1] = self.Vdb[i+1]+(db**2)
-            self.weights[i] -= (learningRate/np.sqrt(self.Vdw[i]+self.epsilon))*dw
-            self.bias[i+1] -= (learningRate/np.sqrt(self.Vdb[i+1]+self.epsilon))*db
+            self.weights[i] -= (learningRate /np.sqrt(self.Vdw[i]+self.epsilon))*dw
+            self.bias[i+1] -= (learningRate /np.sqrt(self.Vdb[i+1]+self.epsilon))*db
 
     def RMSprop(self, learningRate=0.001):
         for i in range(len(self.layers)-1):
             dw, db = self.get_gradients(i)
             self.Vdw[i] = self.beta*self.Vdw[i]+(1-self.beta)*(dw**2)
             self.Vdb[i+1] = self.beta*self.Vdb[i+1]+(1-self.beta)*(db**2)
-            self.weights[i] -= (learningRate/np.sqrt(self.Vdw[i]+self.epsilon))*dw
-            self.bias[i+1] -= (learningRate/np.sqrt(self.Vdb[i+1]+self.epsilon))*db
+            self.weights[i] -= (learningRate /np.sqrt(self.Vdw[i]+self.epsilon))*dw
+            self.bias[i+1] -= (learningRate /np.sqrt(self.Vdb[i+1]+self.epsilon))*db
 
     def Adam(self, learningRate=0.001):
         for i in range(len(self.layers)-1):
@@ -255,9 +294,10 @@ class Optimizers(Weight_Initalizer):
             v_db = self.Vdb[i+1]/(1-self.beta2)
             self.bias[i+1] -= (learningRate/np.sqrt(v_db+self.epsilon))*m_db
 
+
 class MultiLayerNeuralNetwork(Activation_Functions, Losses, Optimizers):
     def __init__(self):
-        super(MultiLayerNeuralNetwork,self).__init__()
+        super(MultiLayerNeuralNetwork, self).__init__()
         self.history = {'Losses': [], 'Weights': [],
                         'Bias': [], 'Activations': []}
         self.loss_functions = {
@@ -282,7 +322,7 @@ class MultiLayerNeuralNetwork(Activation_Functions, Losses, Optimizers):
             "tanh": self.tanh,
             "linear": self.linear
         }
-        
+
     def add_layer(self, nodes=3, activation_function='linear', input_layer=False, output_layer=False, dropouts=False, dropout_fraction=None, **kwargs):
         if (input_layer is not False):
             self.n_inputs = nodes
@@ -296,24 +336,29 @@ class MultiLayerNeuralNetwork(Activation_Functions, Losses, Optimizers):
             self.layers.append({'nodes': nodes, 'activation_function': activation_function,
                                'dropouts': dropouts, 'dropout_fraction': dropout_fraction})
 
-    def compile_model(self, loss_function='mse', weight_initializer='glorot_uniform',**kwargs):
+    def compile_model(self, loss_function='mse', weight_initializer='glorot_uniform', **kwargs):
         self.loss_func = loss_function
         for i in range(len(self.layers)):
             self.activations.append(np.zeros(self.layers[i]['nodes']))
             self.bias.append(np.zeros(self.layers[i]['nodes']))
             self.Vdb.append(np.zeros(self.layers[i]['nodes']))
             self.Mdb.append(np.zeros(self.layers[i]['nodes']))
-            self.dropout_nodes.append(np.zeros(self.layers[i]['nodes'], dtype=bool))
+            self.dropout_nodes.append(
+                np.zeros(self.layers[i]['nodes'], dtype=bool))
             self.derivatives_b.append(np.zeros(self.layers[i]['nodes']))
 
             if (self.layers[i]['dropouts'] == True):
                 self.add_dropouts(i, self.layers[i]['dropout_fraction'])
 
         for i in range(len(self.layers)-1):
-            self.Vdw.append(np.zeros((self.layers[i+1]['nodes'], self.layers[i]['nodes'])))
-            self.Mdw.append(np.zeros((self.layers[i+1]['nodes'], self.layers[i]['nodes'])))
-            self.weights.append(np.random.rand(self.layers[i+1]['nodes'], self.layers[i]['nodes']))
-            self.derivatives_w.append(np.zeros((self.layers[i+1]['nodes'], self.layers[i]['nodes'])))
+            self.Vdw.append(
+                np.zeros((self.layers[i+1]['nodes'], self.layers[i]['nodes'])))
+            self.Mdw.append(
+                np.zeros((self.layers[i+1]['nodes'], self.layers[i]['nodes'])))
+            self.weights.append(np.random.rand(
+                self.layers[i+1]['nodes'], self.layers[i]['nodes']))
+            self.derivatives_w.append(
+                np.zeros((self.layers[i+1]['nodes'], self.layers[i]['nodes'])))
 
         self.weight_initializer[weight_initializer](kwargs)
 
@@ -347,18 +392,18 @@ class MultiLayerNeuralNetwork(Activation_Functions, Losses, Optimizers):
                 self.beta1 = value
             elif (key == 'beta2'):
                 self.beta2 = value
-    
-    def check_encoding(self,X):
-        return ((X.sum(axis=1)-np.ones(X.shape[0])).sum()==0)
+
+    def check_encoding(self, X):
+        return ((X.sum(axis=1)-np.ones(X.shape[0])).sum() == 0)
 
     def forward_propagate(self, x):
         self.activations[0] = x
         for i in range(1, len(self.layers)):
             z = np.dot(self.activations[i-1], self.weights[i-1].T)+self.bias[i]
-            self.activations[i]=self.activation_functions[self.layers[i]['activation_function']](z)
-            
-            if(self.layers[i]['dropouts']==True):
-               self.activations[i][np.where(self.dropout_nodes[i])]=0
+            self.activations[i] = self.activation_functions[self.layers[i]['activation_function']](z)
+
+            if (self.layers[i]['dropouts'] == True):
+                self.activations[i][np.where(self.dropout_nodes[i])] = 0
 
         return self.activations[len(self.layers)-1]
 
@@ -367,35 +412,38 @@ class MultiLayerNeuralNetwork(Activation_Functions, Losses, Optimizers):
         if (self.loss_func == 'mse'):
             error = -2*(y-p)
         elif (self.loss_func == 'binary_cross_entropy'):
+            p += self.epsilon
             error = -(y/p)+((1-y)/(1-p))
         elif (self.loss_func == 'categorical_cross_entropy'):
+            p += self.epsilon
             error = -(y/p)
-        
+
         for i in reversed(range(len(self.derivatives_w))):
-            delta_w=None
-            delta_w_re=None
-            delta_b=None
-            func_name=self.layers[i+1]['activation_function']
+            delta_w = None
+            delta_w_re = None
+            delta_b = None
+            func_name = self.layers[i+1]['activation_function']
             activation_func = self.activation_functions[func_name]
 
-            if(func_name=='softmax'):
-                delta_w=error @ activation_func(self.activations[i+1], derive=True)
-                delta_b = error @ activation_func(self.activations[i+1], derive=True)
+            if (func_name == 'softmax'):
+                delta_w = error @ activation_func(
+                    self.activations[i+1], derive=True)
+                delta_b = error @ activation_func(
+                    self.activations[i+1], derive=True)
             else:
                 delta_w = error * activation_func(self.activations[i+1], derive=True)
                 delta_b = error * activation_func(self.activations[i+1], derive=True)
-            
+
             delta_w_re = delta_w.reshape(delta_w.shape[0], -1)
-            activation_re = self.activations[i].reshape(self.activations[i].shape[0], -1)
+            activation_re = self.activations[i].reshape(
+                self.activations[i].shape[0], -1)
             self.derivatives_w[i] = np.dot(delta_w_re, activation_re.T)
             self.derivatives_b[i+1] = delta_b
             error = np.dot(self.weights[i].T, delta_w)
-        
 
-    def fit(self, x, y, learning_rate=0.001, epochs=50, batch_size=None, show_loss=False, early_stopping=False,patience=2):
-            
+    def fit(self, x, y, learning_rate=0.001, epochs=50, batch_size=None, show_loss=False, early_stopping=False, patience=2):
         loss = float('inf')
-        patience_count=0
+        patience_count = 0
         if (batch_size is None):
             batch_size = x.shape[0]
         for i in range(epochs):
@@ -413,12 +461,12 @@ class MultiLayerNeuralNetwork(Activation_Functions, Losses, Optimizers):
 
             loss = sum_errors / batch_size
             if (early_stopping == True and len(self.history['Losses']) > 1 and loss > self.history['Losses'][-1]):
-                patience_count+=1
-                if(patience_count>=patience):
+                patience_count += 1
+                if (patience_count >= patience):
                     print(
-                    "\n<================(EARLY STOPPING AT --> EPOCH {})==================> ".format(i))
+                        "\n<================(EARLY STOPPING AT --> EPOCH {})==================> ".format(i))
                     break
-                
+
             self.history['Losses'].append(loss)
             self.history['Weights'].append(self.weights)
             self.history['Bias'].append(self.bias)
@@ -435,12 +483,13 @@ class MultiLayerNeuralNetwork(Activation_Functions, Losses, Optimizers):
         for j, val in enumerate(x):
             values = val
             for i in range(1, len(self.layers)):
-                if(self.layers[i-1]['dropouts']==True):
-                    wgt=self.weights[i-1]*self.layers[i-1]['dropout_fraction']
+                if (self.layers[i-1]['dropouts'] == True):
+                    wgt = self.weights[i-1] * self.layers[i-1]['dropout_fraction']
                     z = np.dot(values, wgt.T)+self.bias[i]
                 else:
                     z = np.dot(values, self.weights[i-1].T)+self.bias[i]
-                values = self.activation_functions[self.layers[i]['activation_function']](z)
+                values = self.activation_functions[self.layers[i]['activation_function']](
+                    z)
             outputs.append(values)
 
         return np.array(outputs).reshape(-1, self.n_outputs)
