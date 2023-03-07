@@ -17,6 +17,34 @@ class Activation_Functions():
             else:
                 return 1/(1+np.exp(-z))
     
+    def softmax(self,z,derive=False):
+        if(derive):
+            if (z.ndim==2):
+                return [self.softmax(i,derive=True) for i in z]
+            else:
+                '''
+                This is the Vectorized method for calculating jacobian matrix
+                Reference-https://medium.com/intuitionmath/how-to-implement-the-softmax-derivative-independently-from-any-loss-function-ae6d44363a9d
+                
+                z=z.reshape(-1,1)
+                return (np.diagflat(z)-np.dot(z,z.T))
+
+                '''
+                z=z.reshape(-1,1)
+                return (np.diagflat(z)-np.dot(z,z.T))
+
+        else:
+            '''
+            [np.exp(inputs-max(inputs))]
+
+            is done just for mathematical convenience
+            and also for removing overflow error if occured
+            (outputs will have no effect)
+
+            '''
+            exp_vals=np.exp(z-np.max(z))
+            return exp_vals/np.sum(exp_vals) 
+
     def relu(self, z, derive=False):
         if (derive):
             return np.where(z > 0, 1, 0)
@@ -68,6 +96,9 @@ class Losses:
     
     def binary_cross_entropy(self, y, p):
         return np.mean(-(y*np.log(p)+(1-y)*np.log(1-p)))
+    
+    def categorical_cross_entropy(self, y, p):
+        return np.mean(-np.sum(y*np.log(p)))
 
 class instance_variables:
     
@@ -231,7 +262,8 @@ class MultiLayerNeuralNetwork(Activation_Functions, Losses, Optimizers):
                         'Bias': [], 'Activations': []}
         self.loss_functions = {
             "mse": self.mse,
-            "binary_cross_entropy": self.binary_cross_entropy
+            "binary_cross_entropy": self.binary_cross_entropy,
+            "categorical_cross_entropy": self.categorical_cross_entropy
         }
         self.optimizer = 'RMSprop'
         self.optimizer_function = {
@@ -243,13 +275,14 @@ class MultiLayerNeuralNetwork(Activation_Functions, Losses, Optimizers):
         }
         self.activation_functions = {
             "sigmoid": self.sigmoid,
+            "softmax": self.softmax,
             "relu": self.relu,
             "leaky_relu": self.leaky_relu,
             "elu": self.elu,
             "tanh": self.tanh,
             "linear": self.linear
         }
-
+        
     def add_layer(self, nodes=3, activation_function='linear', input_layer=False, output_layer=False, dropouts=False, dropout_fraction=None, **kwargs):
         if (input_layer is not False):
             self.n_inputs = nodes
@@ -263,7 +296,7 @@ class MultiLayerNeuralNetwork(Activation_Functions, Losses, Optimizers):
             self.layers.append({'nodes': nodes, 'activation_function': activation_function,
                                'dropouts': dropouts, 'dropout_fraction': dropout_fraction})
 
-    def compile_model(self, loss_function='mse', weight_initializer='glorot_uniform', **kwargs):
+    def compile_model(self, loss_function='mse', weight_initializer='glorot_uniform',**kwargs):
         self.loss_func = loss_function
         for i in range(len(self.layers)):
             self.activations.append(np.zeros(self.layers[i]['nodes']))
@@ -315,6 +348,9 @@ class MultiLayerNeuralNetwork(Activation_Functions, Losses, Optimizers):
             elif (key == 'beta2'):
                 self.beta2 = value
     
+    def check_encoding(self,X):
+        return ((X.sum(axis=1)-np.ones(X.shape[0])).sum()==0)
+
     def forward_propagate(self, x):
         self.activations[0] = x
         for i in range(1, len(self.layers)):
@@ -332,18 +368,32 @@ class MultiLayerNeuralNetwork(Activation_Functions, Losses, Optimizers):
             error = -2*(y-p)
         elif (self.loss_func == 'binary_cross_entropy'):
             error = -(y/p)+((1-y)/(1-p))
-
+        elif (self.loss_func == 'categorical_cross_entropy'):
+            error = -(y/p)
+        
         for i in reversed(range(len(self.derivatives_w))):
-            activation_func = self.activation_functions[self.layers[i+1]['activation_function']]
-            delta_w = error * activation_func(self.activations[i+1], derive=True)
-            delta_b = error * activation_func(self.activations[i+1], derive=True)
+            delta_w=None
+            delta_w_re=None
+            delta_b=None
+            func_name=self.layers[i+1]['activation_function']
+            activation_func = self.activation_functions[func_name]
+
+            if(func_name=='softmax'):
+                delta_w=error @ activation_func(self.activations[i+1], derive=True)
+                delta_b = error @ activation_func(self.activations[i+1], derive=True)
+            else:
+                delta_w = error * activation_func(self.activations[i+1], derive=True)
+                delta_b = error * activation_func(self.activations[i+1], derive=True)
+            
             delta_w_re = delta_w.reshape(delta_w.shape[0], -1)
             activation_re = self.activations[i].reshape(self.activations[i].shape[0], -1)
             self.derivatives_w[i] = np.dot(delta_w_re, activation_re.T)
             self.derivatives_b[i+1] = delta_b
             error = np.dot(self.weights[i].T, delta_w)
+        
 
     def fit(self, x, y, learning_rate=0.001, epochs=50, batch_size=None, show_loss=False, early_stopping=False,patience=2):
+            
         loss = float('inf')
         patience_count=0
         if (batch_size is None):
@@ -368,6 +418,7 @@ class MultiLayerNeuralNetwork(Activation_Functions, Losses, Optimizers):
                     print(
                     "\n<================(EARLY STOPPING AT --> EPOCH {})==================> ".format(i))
                     break
+                
             self.history['Losses'].append(loss)
             self.history['Weights'].append(self.weights)
             self.history['Bias'].append(self.bias)
