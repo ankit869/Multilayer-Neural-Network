@@ -2,19 +2,16 @@
 This is the complete code of MultiLayer Neural Network
 
 Developed by: 
-- Ankit Kohli (Student at Delhi University)
-- ankitkohli181@gmail.com (mail)
-
-This is created as a open source project.
-I request if anybody running this python file, found any error then please report me.
+    - Ankit Kohli (Student at Delhi University)
+    - ankitkohli181@gmail.com (mail)
 
 Have fun!
 
 '''
 
 import numpy as np
-import pandas as pd
 import random
+import time
 
 class Activation_Functions():
     def __init__(self):
@@ -51,23 +48,33 @@ class Activation_Functions():
                 return [self.softmax(i, derive=True) for i in z]
             else:
                 '''
-                This is the Vectorized method for calculating jacobian matrix
-                Reference-https://medium.com/intuitionmath/how-to-implement-the-softmax-derivative-independently-from-any-loss-function-ae6d44363a9d
+                >>Method-1
+                  This is the Vectorized method for calculating jacobian matrix
+                  Reference-https://medium.com/intuitionmath/how-to-implement-the-softmax-derivative-independently-from-any-loss-function-ae6d44363a9d
 
-                z=z.reshape(-1,1)
-                return (np.diagflat(z)-np.dot(z,z.T))
+                  z=z.reshape(-1,1)
+                  return (np.diagflat(z)-np.dot(z,z.T))
+
+                >>Method-2
+                  Reference-https://e2eml.school/softmax.html#:~:text=Backpropagation,respect%20to%20its%20output%20values
+
+                  z=z.reshape(1,-1)
+                  return (z * np.identity(z.size)-z.transpose() @ z)
+
+                  Note-This method will require gradients of same shape as (1,-1), Otherwise It will produce error.
 
                 '''
-                z = z.reshape(-1, 1)
+                z = z.reshape(-1,1)
                 return (np.diagflat(z)-np.dot(z, z.T))
 
         else:
             '''
             Another method in case of softmax for handling overflow error without clipping
+
             [np.exp(inputs-max(inputs))]
 
-            is done just for mathematical convenience
-            and also for removing overflow error if occured
+            This is also done for mathematical convenience
+            and for removing overflow error if occured
             (outputs will have no effect)
 
             '''
@@ -81,7 +88,6 @@ class Activation_Functions():
             if (isinstance(z,np.ndarray)):
                 return np.array([max(0, i) for i in z])
             else:
-                print(z)
                 return max(0, z)
 
     def tanh(self, z, derive=False):
@@ -150,6 +156,7 @@ class instance_variables:
         self.activations = []
         self.dropout_nodes = []
         self.layers = []
+        self.params=[]
 
 
 class Weight_Initalizer(instance_variables):
@@ -323,42 +330,62 @@ class MultiLayerNeuralNetwork(Activation_Functions, Losses, Optimizers):
             "linear": self.linear
         }
 
-    def add_layer(self, nodes=3, activation_function='linear', input_layer=False, output_layer=False, dropouts=False, dropout_fraction=None, **kwargs):
+    def show_summary(self):
+        print(f'''
+        {'( MODEL SUMMARY )'.center(80)}
+
+        ==================================================================================
+        {"Layer".center(20)}{"Activation Function".center(20)}{"Output_dim".center(20)}{"Params".center(20)}
+        ==================================================================================''')
+
+        for i in range(len(self.layers)):
+            print(f'''
+        {self.layers[i]['type'].center(20)}{str(self.layers[i]['activation_function']).center(20)}{str((None,self.layers[i]['nodes'])).center(20)}{str(int(self.params[i])).center(20)}
+        ----------------------------------------------------------------------------------''')
+        
+        print(f'''
+        ==================================================================================
+
+        Total Params (trainable) - {int(np.sum(self.params))}
+        __________________________________________________________________________________
+        ''')
+
+   
+    def add_layer(self, nodes=3, activation_function='linear',conv_input=False, input_layer=False, output_layer=False, dropouts=False, dropout_fraction=None, **kwargs):
         if (input_layer is not False):
             self.n_inputs = nodes
-            self.layers.append(
-                {'nodes': nodes, 'activation_function': 'linear', 'dropouts': False})
+            self.layers.append({'nodes': nodes, 'activation_function': 'linear', 'dropouts': False,'type':'Input'})
         elif (output_layer is not False):
             self.n_outputs = nodes
-            self.layers.append(
-                {'nodes': nodes, 'activation_function': activation_function, 'dropouts': False})
+            self.layers.append({'nodes': nodes, 'activation_function': activation_function, 'dropouts': False,'type':'Output'})
         else:
-            self.layers.append({'nodes': nodes, 'activation_function': activation_function,
-                               'dropouts': dropouts, 'dropout_fraction': dropout_fraction})
+            self.layers.append({'nodes': nodes, 'activation_function': activation_function,'dropouts': dropouts, 'dropout_fraction': dropout_fraction,'type':'Dense'})
 
-    def compile_model(self, loss_function='mse', weight_initializer='glorot_uniform', **kwargs):
+
+    def compile_model(self, loss_function='mse', weight_initializer='glorot_uniform',show_summary=True, **kwargs):
         self.loss_func = loss_function
+        self.params=np.zeros(len(self.layers))
         for i in range(len(self.layers)):
             self.activations.append(np.zeros(self.layers[i]['nodes']))
             self.bias.append(np.zeros(self.layers[i]['nodes']))
             self.Vdb.append(np.zeros(self.layers[i]['nodes']))
             self.Mdb.append(np.zeros(self.layers[i]['nodes']))
-            self.dropout_nodes.append(
-                np.zeros(self.layers[i]['nodes'], dtype=bool))
+            self.dropout_nodes.append(np.zeros(self.layers[i]['nodes'], dtype=bool))
             self.derivatives_b.append(np.zeros(self.layers[i]['nodes']))
 
             if (self.layers[i]['dropouts'] == True):
                 self.add_dropouts(i, self.layers[i]['dropout_fraction'])
 
+            if i>0:
+                self.params[i]+=self.layers[i]['nodes']
+
         for i in range(len(self.layers)-1):
-            self.Vdw.append(
-                np.zeros((self.layers[i+1]['nodes'], self.layers[i]['nodes'])))
-            self.Mdw.append(
-                np.zeros((self.layers[i+1]['nodes'], self.layers[i]['nodes'])))
-            self.weights.append(np.random.rand(
-                self.layers[i+1]['nodes'], self.layers[i]['nodes']))
-            self.derivatives_w.append(
-                np.zeros((self.layers[i+1]['nodes'], self.layers[i]['nodes'])))
+            self.Vdw.append(np.zeros((self.layers[i+1]['nodes'], self.layers[i]['nodes'])))
+            self.Mdw.append(np.zeros((self.layers[i+1]['nodes'], self.layers[i]['nodes'])))
+            self.weights.append(np.random.rand(self.layers[i+1]['nodes'], self.layers[i]['nodes']))
+            self.derivatives_w.append(np.zeros((self.layers[i+1]['nodes'], self.layers[i]['nodes'])))
+
+            self.params[i+1]+=(self.layers[i+1]['nodes']*self.layers[i]['nodes'])
 
         self.weight_initializer[weight_initializer](kwargs)
 
@@ -367,6 +394,9 @@ class MultiLayerNeuralNetwork(Activation_Functions, Losses, Optimizers):
                 self.leaky_relu_fraction = value
             elif (key == 'elu_alpha'):
                 self.elu_alpha = value
+
+        if(show_summary):
+            self.show_summary()
 
     def add_dropouts(self, layer, fraction):
         drop_size = np.ceil(fraction*self.layers[layer]['nodes'])
@@ -426,27 +456,27 @@ class MultiLayerNeuralNetwork(Activation_Functions, Losses, Optimizers):
             activation_func = self.activation_functions[func_name]
 
             if (func_name == 'softmax'):
-                delta_w = error @ activation_func(
-                    self.activations[i+1], derive=True)
-                delta_b = error @ activation_func(
-                    self.activations[i+1], derive=True)
+                delta_w = np.dot(error,activation_func(self.activations[i+1], derive=True))
+                delta_b = delta_w
             else:
                 delta_w = error * activation_func(self.activations[i+1], derive=True)
-                delta_b = error * activation_func(self.activations[i+1], derive=True)
-
+                delta_b = delta_w
+                
             delta_w_re = delta_w.reshape(delta_w.shape[0], -1)
-            activation_re = self.activations[i].reshape(
-                self.activations[i].shape[0], -1)
-            self.derivatives_w[i] = np.dot(delta_w_re, activation_re.T)
+            activation_re = self.activations[i].reshape(self.activations[i].shape[0], -1)
+            self.derivatives_w[i] = np.dot(delta_w_re,activation_re.T)
             self.derivatives_b[i+1] = delta_b
-            error = np.dot(self.weights[i].T, delta_w)
+            error = np.dot(self.weights[i].T,delta_w)
 
     def fit(self, x, y, learning_rate=0.001, epochs=50, batch_size=None, show_loss=False, early_stopping=False, patience=2):
         loss = float('inf')
+        total_time=0
         patience_count = 0
         if (batch_size is None):
             batch_size = x.shape[0]
         for i in range(epochs):
+            t = Timer()
+            t.start()
             sum_errors = 0
             if (batch_size != x.shape[0]):
                 batch = np.random.choice(x.shape[0], batch_size)
@@ -458,13 +488,14 @@ class MultiLayerNeuralNetwork(Activation_Functions, Losses, Optimizers):
                 self.back_propagate(y[j], output)
                 self.optimizer_function[self.optimizer](learning_rate)
                 sum_errors += self.loss_functions[self.loss_func](y[j], output)
-
+            elapse_time=t.stop()
+            total_time+=elapse_time
             loss = sum_errors / batch_size
             if (early_stopping == True and len(self.history['Losses']) > 1 and loss > self.history['Losses'][-1]):
                 patience_count += 1
                 if (patience_count >= patience):
                     print(
-                        "\n<================(EARLY STOPPING AT --> EPOCH {})==================> ".format(i))
+                        "\n<==================(EARLY STOPPING AT --> EPOCH {})====================> ".format(i))
                     break
 
             self.history['Losses'].append(loss)
@@ -472,10 +503,10 @@ class MultiLayerNeuralNetwork(Activation_Functions, Losses, Optimizers):
             self.history['Bias'].append(self.bias)
             self.history['Activations'].append(self.activations)
             if (show_loss):
-                print("Loss: {} =================> at epoch {}".format(loss, i+1))
+                print(f"Loss: {loss:.8f} =================> at epoch {i+1}, elapse-time : {elapse_time:.8f} seconds")
         print("\nFinal Minimised Loss : {}".format(self.history['Losses'][-1]))
-        print("\nTraining complete!")
-        print("================================================ :)")
+        print(f"\nTraining complete!! , Average Elapse-Time (per epoch) : {(total_time/epochs):.8f} seconds")
+        print("========================================================================= :)")
         return self.history['Losses']
 
     def predict(self, x):
@@ -488,8 +519,33 @@ class MultiLayerNeuralNetwork(Activation_Functions, Losses, Optimizers):
                     z = np.dot(values, wgt.T)+self.bias[i]
                 else:
                     z = np.dot(values, self.weights[i-1].T)+self.bias[i]
-                values = self.activation_functions[self.layers[i]['activation_function']](
-                    z)
+                values = self.activation_functions[self.layers[i]['activation_function']](z)
             outputs.append(values)
 
         return np.array(outputs).reshape(-1, self.n_outputs)
+
+
+class TimerError(Exception):
+    """A custom exception used to report errors in use of Timer class"""
+
+class Timer:
+    def __init__(self):
+        self._start_time = None
+        
+    def start(self):
+        """Start a new timer"""
+        if self._start_time is not None:
+            raise TimerError(f"Timer is running. Use .stop() to stop it")
+
+        self._start_time = time.perf_counter()
+
+    def stop(self,show_elapsed=False):
+        """Stop the timer, and report the elapsed time"""
+        if self._start_time is None:
+            raise TimerError(f"Timer is not running. Use .start() to start it")
+
+        elapsed_time = time.perf_counter() - self._start_time
+        self._start_time = None
+        if show_elapsed:
+            print(f"Elapsed time: {elapsed_time:0.4f} seconds")
+        return elapsed_time
