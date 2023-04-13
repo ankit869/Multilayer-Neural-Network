@@ -125,7 +125,6 @@ class Activation_Functions():
         else:
             return z
 
-
 class Losses:
     def __init__(self):
         super(Losses, self).__init__()
@@ -183,14 +182,13 @@ class Weight_Initalizer(instance_variables):
         for i in range(len(self.layers)-1):
             self.weights[i] = np.random.uniform(minval, maxval, size=(
                 self.layers[i+1]['nodes'], self.layers[i]['nodes']))
-
+    
     def random_normal(self, args=dict()):
         for key, value in args.items():
             if (key == 'seed'):
                 np.random.seed(value)
         for i in range(len(self.layers)-1):
-            self.weights[i] = np.random.randn(
-                self.layers[i+1]['nodes'], self.layers[i]['nodes'])
+            self.weights[i] = np.random.randn(self.layers[i+1]['nodes'], self.layers[i]['nodes'])
 
     def glorot_uniform(self, args=dict()):
         for key, value in args.items():
@@ -208,8 +206,7 @@ class Weight_Initalizer(instance_variables):
         for i in range(len(self.layers)-1):
             limit = np.sqrt(
                 2 / (self.layers[i+1]['nodes'] + self.layers[i]['nodes']))
-            vals = np.random.randn(
-                self.layers[i+1]['nodes'], self.layers[i]['nodes'])*limit
+            vals = np.random.randn(self.layers[i+1]['nodes'], self.layers[i]['nodes'])*limit
             self.weights[i] = vals
 
     def he_uniform(self, seed=None, args=dict()):
@@ -530,11 +527,13 @@ class MultiLayerNeuralNetwork(ANN_propagate,Convolutional_network):
             for j in batch:
                 if self.convolution is True:
                     output = self.conv_forward_propagate(x[j])
-                    self.conv_back_propagate(y[j], output)
-                    self.conv_optimizer_function[self.optimizer](learning_rate)
-                    output = self.forward_propagate(self.conv_output.flatten())
-                    self.back_propagate(y[j], output)
-                    self.optimizer_function[self.optimizer](learning_rate)
+                    # self.conv_back_propagate(y[j], output)
+                    # self.conv_optimizer_function[self.optimizer](learning_rate)
+                    # output = self.forward_propagate(self.conv_output.flatten())
+                    # self.back_propagate(y[j], output)
+                    # self.optimizer_function[self.optimizer](learning_rate)
+                    print(output.shape)
+                    return
 
                 else:
                     output = self.forward_propagate(x[j])

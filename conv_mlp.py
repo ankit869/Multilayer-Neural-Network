@@ -405,12 +405,19 @@ class Convolutional_network(Conv_Weight_Initalizer):
                     else:
                         kernel=self.c_weights[i][:,:,:,k]
 
-                    conv_out=self.conv2d(x,kernel,padding=layer['padding'],strides=layer['strides'],pad_size=layer['pad_size'])
-                    output=self.activation_functions[self.c_layers[i]['activation_function']](conv_out.flatten())
+                    if i==0:
+                        conv_out=self.conv2d(x,kernel,padding=layer['padding'],strides=layer['strides'],pad_size=layer['pad_size'])
+                    else:
+                        conv_out=self.conv2d(self.conv_output,kernel,padding=layer['padding'],strides=layer['strides'],pad_size=layer['pad_size'])
+                    
+                    output=self.activation_functions[layer['activation_function']](conv_out.flatten())
                     self.c_activations[i][:,:,k]=output.reshape(conv_out.shape)
+                self.conv_output=self.c_activations[i]
                 i+=1
-                        
+
             else:
-                activation=self.c_activations[i-1]    
-                self.pool_outputs[j]=self.pool2d(activation,pool_type=layer['pool_type'],size=layer['size'],padding=layer['padding'],strides=layer['strides'],pad_size=layer['pad_size'])
+                for k in range(len(self.c_activations[i-1])):
+                    self.pool_outputs[j][:,:,k]=self.pool2d(self.c_activations[i-1][:,:,k],pool_type=layer['pool_type'],size=layer['size'],padding=layer['padding'],strides=layer['strides'],pad_size=layer['pad_size'])
+                self.conv_output=self.pool_outputs[j]
                 j+=1
+        return self.conv_output
