@@ -1,0 +1,4 @@
+C:/Users/Dell/MY-CODES/C++ PROGRAMMING/PYBIND11/pybind_neural_link/build/temp.win-amd64-cpython-310/Release/neural_link/CMakeFiles/neural_cpp_link.dir
+C:/Users/Dell/MY-CODES/C++ PROGRAMMING/PYBIND11/pybind_neural_link/build/temp.win-amd64-cpython-310/Release/neural_link/CMakeFiles/ALL_BUILD.dir
+C:/Users/Dell/MY-CODES/C++ PROGRAMMING/PYBIND11/pybind_neural_link/build/temp.win-amd64-cpython-310/Release/neural_link/CMakeFiles/ZERO_CHECK.dir
+C:/Users/Dell/MY-CODES/C++ PROGRAMMING/PYBIND11/pybind_neural_link/build/temp.win-amd64-cpython-310/Release/neural_link/pybind11/CMakeFiles/ALL_BUILD.dir

@@ -1,4 +1,5 @@
 import numpy as np
+from neural_cpp_link import py_conv2d_multi_channel,py_conv2d_single_channel,py_pool2d
 
 class conv_instance_variables:
     def __init__(self):
@@ -248,7 +249,11 @@ class Convolutional_network(Conv_Weight_Initalizer):
         elif(ptype=='avg'):
             return np.mean(x)
     
-    def pool2d(self,Input,pool_type='max',size=(2,2),padding='valid',strides=1,pad_size=1):
+    def pool2d(self,Input,pool_type='max',size=(2,2),padding='valid',strides=1,pad_size=1,cmode=True):
+
+        if(cmode):
+            return py_pool2d(Input,pool_type,size,padding,strides,pad_size)
+
         xInput=Input.shape[0]
         yInput=Input.shape[1]
 
@@ -278,7 +283,7 @@ class Convolutional_network(Conv_Weight_Initalizer):
         elif(pool_type=='global_min'):
             return np.min(Input)
         elif(pool_type=='global_avg'):
-            return np.mmean(Input)
+            return np.mean(Input)
         else:
             j=0
             for y in range(InpPadded.shape[1]):
@@ -297,17 +302,22 @@ class Convolutional_network(Conv_Weight_Initalizer):
                     j+=1
             return output
     
-    def conv2d(self,Input,kernel,padding='valid',strides=1,pad_size=1):
+    def conv2d(self,Input,kernel,padding='valid',strides=1,pad_size=1,cmode=True):
+
         multichannel=False
         if(Input.ndim==2 or kernel.ndim==2):
             xKernShape,yKernShape=kernel.shape
             xInput,yInput=Input.shape
             nChannels=1
             nfilters=1
+            if(cmode):
+                return py_conv2d_single_channel(Input,kernel,padding,strides,pad_size)
         else:
             xKernShape,yKernShape,nfilters=kernel.shape
             xInput,yInput,nChannels=Input.shape
             multichannel=True
+            if(cmode):
+                return py_conv2d_multi_channel(Input,kernel,padding,strides,pad_size)
 
         output=None
         InpPadded=None
@@ -393,7 +403,7 @@ class Convolutional_network(Conv_Weight_Initalizer):
             else:
                 self.pool_outputs.append(np.zeros(self.c_layers[i]['output_shape'][1:]))
     
-    def conv_forward_propagate(self,x):
+    def conv_forward_propagate(self,x,cmode=True):
         i=0
         j=0
         for layer in (self.c_layers):
@@ -406,9 +416,9 @@ class Convolutional_network(Conv_Weight_Initalizer):
                         kernel=self.c_weights[i][:,:,:,k]
 
                     if i==0:
-                        conv_out=self.conv2d(x,kernel,padding=layer['padding'],strides=layer['strides'],pad_size=layer['pad_size'])
+                        conv_out=self.conv2d(x,kernel,padding=layer['padding'],strides=layer['strides'],pad_size=layer['pad_size'],cmode=cmode)
                     else:
-                        conv_out=self.conv2d(self.conv_output,kernel,padding=layer['padding'],strides=layer['strides'],pad_size=layer['pad_size'])
+                        conv_out=self.conv2d(self.conv_output,kernel,padding=layer['padding'],strides=layer['strides'],pad_size=layer['pad_size'],cmode=cmode)
                     
                     output=self.activation_functions[layer['activation_function']](conv_out.flatten())
                     self.c_activations[i][:,:,k]=output.reshape(conv_out.shape)
@@ -417,7 +427,7 @@ class Convolutional_network(Conv_Weight_Initalizer):
 
             else:
                 for k in range(len(self.c_activations[i-1])):
-                    self.pool_outputs[j][:,:,k]=self.pool2d(self.c_activations[i-1][:,:,k],pool_type=layer['pool_type'],size=layer['size'],padding=layer['padding'],strides=layer['strides'],pad_size=layer['pad_size'])
+                    self.pool_outputs[j][:,:,k]=self.pool2d(self.c_activations[i-1][:,:,k],pool_type=layer['pool_type'],size=layer['size'],padding=layer['padding'],strides=layer['strides'],pad_size=layer['pad_size'],cmode=cmode)
                 self.conv_output=self.pool_outputs[j]
                 j+=1
         return self.conv_output

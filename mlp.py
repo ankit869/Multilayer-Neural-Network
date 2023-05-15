@@ -332,17 +332,15 @@ class ANN_propagate(Activation_Functions, Losses, Optimizers):
         for i in reversed(range(len(self.derivatives_w))):
             delta_w = None
             delta_w_re = None
-            delta_b = None
             func_name = self.layers[i+1]['activation_function']
             activation_func = self.activation_functions[func_name]
 
             if (func_name == 'softmax'):
                 delta_w = np.dot(error,activation_func(self.activations[i+1], derive=True))
-                delta_b = delta_w
             else:
                 delta_w = error * activation_func(self.activations[i+1], derive=True)
-                delta_b = delta_w
-                    
+
+            delta_b = delta_w
             delta_w_re = delta_w.reshape(delta_w.shape[0], -1)
             activation_re = self.activations[i].reshape(self.activations[i].shape[0], -1)
             self.derivatives_w[i] = np.dot(delta_w_re,activation_re.T)
@@ -509,41 +507,47 @@ class MultiLayerNeuralNetwork(ANN_propagate,Convolutional_network):
     def check_encoding(self, X):
         return ((X.sum(axis=1)-np.ones(X.shape[0])).sum() == 0)
     
-    def fit(self, x, y, learning_rate=0.001, epochs=50, batch_size=None, show_loss=False, early_stopping=False, patience=2):
+    def fit(self, x, y, learning_rate=0.001, epochs=50, batch_size=1, show_loss=False, early_stopping=False, patience=2):
         loss = float('inf')
         total_time=0
         patience_count = 0
-        if (batch_size is None):
-            batch_size = x.shape[0]
         for i in range(epochs):
             t = Timer()
             t.start()
             sum_errors = 0
-            if (batch_size != x.shape[0]):
-                batch = np.random.choice(x.shape[0], batch_size)
-            else:
-                batch = np.arange(x.shape[0])
-                batch_size = x.shape[0]
-            for j in batch:
-                if self.convolution is True:
-                    output = self.conv_forward_propagate(x[j])
-                    # self.conv_back_propagate(y[j], output)
-                    # self.conv_optimizer_function[self.optimizer](learning_rate)
-                    # output = self.forward_propagate(self.conv_output.flatten())
-                    # self.back_propagate(y[j], output)
-                    # self.optimizer_function[self.optimizer](learning_rate)
-                    print(output.shape)
-                    return
 
-                else:
-                    output = self.forward_propagate(x[j])
-                    self.back_propagate(y[j], output)
-                    self.optimizer_function[self.optimizer](learning_rate)
+            shuffled_indices = np.random.permutation(x.shape[0])
+            X_shuffled = x[shuffled_indices]
+            Y_shuffled = y[shuffled_indices]
 
-                sum_errors += self.loss_functions[self.loss_func](y[j], output)
+            n_batches = int(np.ceil(x.shape[0] / batch_size))
+            for batch in range(n_batches):
+                start = batch * batch_size
+                end = start + batch_size
+                X_batch = X_shuffled[start:end]
+                Y_batch = Y_shuffled[start:end]
+
+                for xi,yi in zip(X_batch,Y_batch):
+                    if self.convolution is True:
+                        output = self.conv_forward_propagate(xi)
+                        # self.conv_back_propagate(y[j], output)
+                        # self.conv_optimizer_function[self.optimizer](learning_rate)
+                        # output = self.forward_propagate(self.conv_output.flatten())
+                        # self.back_propagate(y[j], output)
+                        # self.optimizer_function[self.optimizer](learning_rate)
+                        print(output.shape)
+                        return
+                    else:
+                        output = self.forward_propagate(xi)
+                        self.back_propagate(yi, output)
+                        self.optimizer_function[self.optimizer](learning_rate)
+                
+                sum_errors += self.loss_functions[self.loss_func](yi, output)
+
             elapse_time=t.stop()
             total_time+=elapse_time
-            loss = sum_errors / batch_size
+            loss = sum_errors / n_batches
+
             if (early_stopping == True and len(self.history['Losses']) > 1 and loss > self.history['Losses'][-1]):
                 patience_count += 1
                 if (patience_count >= patience):

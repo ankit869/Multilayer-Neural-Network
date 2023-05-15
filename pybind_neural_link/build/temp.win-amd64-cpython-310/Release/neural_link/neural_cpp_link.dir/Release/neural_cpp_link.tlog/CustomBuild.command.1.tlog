@@ -1,0 +1,10 @@
+^C:\USERS\DELL\MY-CODES\C++ PROGRAMMING\PYBIND11\PYBIND_NEURAL_LINK\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" "-SC:/Users/Dell/MY-CODES/C++ PROGRAMMING/PYBIND11/pybind_neural_link" "-BC:/Users/Dell/MY-CODES/C++ PROGRAMMING/PYBIND11/pybind_neural_link/build/temp.win-amd64-cpython-310/Release/neural_link" --check-stamp-file "C:/Users/Dell/MY-CODES/C++ PROGRAMMING/PYBIND11/pybind_neural_link/build/temp.win-amd64-cpython-310/Release/neural_link/CMakeFiles/generate.stamp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
